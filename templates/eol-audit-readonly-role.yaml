@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Read-only IAM role that lets an external auditor list resource metadata (engine and
+  runtime versions) in this account for end-of-life checks. It grants no access to data
+  such as S3 objects, database contents or secrets. Delete this stack to revoke access.
+
+Parameters:
+  TrustedAccountId:
+    Type: String
+    Description: AWS account ID of the auditor (provided by the auditor).
+    AllowedPattern: "^\\d{12}$"
+    ConstraintDescription: Must be a 12-digit AWS account ID.
+  ExternalId:
+    Type: String
+    Description: >-
+      Unique ID the auditor generated for this account (provided by the auditor).
+      Protects against the confused-deputy problem.
+    MinLength: 16
+    MaxLength: 128
+    AllowedPattern: "^[\\w+=,.@:/-]+$"
+  TrustedPrincipalArn:
+    Type: String
+    Default: ""
+    Description: >-
+      Optional. Restrict access to one IAM role (or ARN pattern with *) in the auditor's
+      account instead of any principal there that holds the external ID.
+  RoleName:
+    Type: String
+    Default: eol-audit-readonly
+    AllowedPattern: "^[\\w+=,.@-]{1,64}$"
+
+Conditions:
+  RestrictPrincipal: !Not [!Equals [!Ref TrustedPrincipalArn, ""]]
+
+Resources:
+  AuditRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      Description: Read-only metadata access for end-of-life audits by an external auditor.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${TrustedAccountId}:root"
+            Action: sts:AssumeRole
+            Condition: !If
+              - RestrictPrincipal
+              - StringEquals:
+                  sts:ExternalId: !Ref ExternalId
+                ArnLike:
+                  aws:PrincipalArn: !Ref TrustedPrincipalArn
+              - StringEquals:
+                  sts:ExternalId: !Ref ExternalId
+      Policies:
+        - PolicyName: eol-audit-list-metadata
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Exactly the describe/list calls the audit makes; nothing else.
+              - Sid: ListVersionedResources
+                Effect: Allow
+                Action:
+                  - ec2:DescribeRegions
+                  - ec2:DescribeInstances
+                  - ec2:DescribeImages
+                  - lambda:ListFunctions
+                  - rds:DescribeDBClusters
+                  - rds:DescribeDBInstances
+                  - elasticache:DescribeCacheClusters
+                  - elasticache:DescribeServerlessCaches
+                  - es:ListDomainNames
+                  - es:DescribeDomains
+                  - eks:ListClusters
+                  - eks:DescribeCluster
+                  - kafka:ListClustersV2
+                  - mq:ListBrokers
+                  - mq:DescribeBroker
+                  - ecs:ListClusters
+                  - ecs:ListServices
+                  - ecs:DescribeServices
+                  - ecs:DescribeTaskDefinition
+                  - ssm:DescribeInstanceInformation
+                  - ssm:ListInventoryEntries
+                Resource: "*"
+      Tags:
+        - Key: purpose
+          Value: eol-audit
+
+Outputs:
+  RoleArn:
+    Description: Send this value back to the auditor.
+    Value: !GetAtt AuditRole.Arn
+  ExternalId:
+    Description: External ID this role requires (for reference).
+    Value: !Ref ExternalId

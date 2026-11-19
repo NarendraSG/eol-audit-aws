@@ -1,0 +1,55 @@
+{
+  "name": "@studiographene/aws-eol-audit",
+  "version": "0.1.0",
+  "description": "Read-only AWS inventory of versioned components checked against endoflife.date, with OAuth-style cross-account onboarding.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./template": "./templates/eol-audit-readonly-role.yaml"
+  },
+  "bin": {
+    "aws-eol-audit": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "CLIENT_SETUP.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@aws-sdk/client-ec2": "^3.1172.0",
+    "@aws-sdk/client-ecs": "^3.1172.0",
+    "@aws-sdk/client-eks": "^3.1172.0",
+    "@aws-sdk/client-elasticache": "^3.1172.0",
+    "@aws-sdk/client-kafka": "^3.1172.0",
+    "@aws-sdk/client-lambda": "^3.1172.0",
+    "@aws-sdk/client-mq": "^3.1172.0",
+    "@aws-sdk/client-opensearch": "^3.1172.0",
+    "@aws-sdk/client-rds": "^3.1172.0",
+    "@aws-sdk/client-ssm": "^3.1172.0",
+    "@aws-sdk/client-sts": "^3.1172.0",
+    "@aws-sdk/credential-providers": "^3.1172.0",
+    "@smithy/types": "^4.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "aws-sdk-client-mock": "^4.1.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
+  }
+}
