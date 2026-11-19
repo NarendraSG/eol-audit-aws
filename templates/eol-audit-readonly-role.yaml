@@ -28,9 +28,18 @@ Parameters:
     Type: String
     Default: eol-audit-readonly
     AllowedPattern: "^[\\w+=,.@-]{1,64}$"
+  AllowLogSampling:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Optional. "true" lets the auditor read a small sample of CloudWatch log lines to check
+      log format (JSON, level, request ID). This is the only permission that reads log
+      content. Leave "false" unless you have agreed to it.
 
 Conditions:
   RestrictPrincipal: !Not [!Equals [!Ref TrustedPrincipalArn, ""]]
+  LogSampling: !Equals [!Ref AllowLogSampling, "true"]
 
 Resources:
   AuditRole:
@@ -85,6 +94,57 @@ Resources:
                   - ssm:DescribeInstanceInformation
                   - ssm:ListInventoryEntries
                 Resource: "*"
+        - PolicyName: tech-audit-list-configuration
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Configuration metadata for the Engg Tech Audit questionnaire checks
+              # (see docs/TECH_AUDIT_COVERAGE.md). No data, secrets or object contents.
+              - Sid: ReadConfiguration
+                Effect: Allow
+                Action:
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeSecurityGroups
+                  - codebuild:ListProjects
+                  - codepipeline:ListPipelines
+                  - autoscaling:DescribeAutoScalingInstances
+                  - application-autoscaling:DescribeScalableTargets
+                  - iam:GenerateCredentialReport
+                  - iam:GetCredentialReport
+                  - iam:ListEntitiesForPolicy
+                  - iam:GetGroup
+                  - logs:DescribeLogGroups
+                  - synthetics:DescribeCanaries
+                  - route53:ListHealthChecks
+                  - backup:ListBackupPlans
+                  - dynamodb:ListTables
+                  - dynamodb:DescribeContinuousBackups
+                  - cloudwatch:DescribeAlarms
+                  - kms:DescribeKey
+                  - budgets:ViewBudget
+                  - ce:GetCostAndUsage
+                  - s3:ListAllMyBuckets
+                  - s3:GetEncryptionConfiguration
+                  - s3:GetBucketPublicAccessBlock
+                  - macie2:GetMacieSession
+                Resource: "*"
+              - Sid: ReadApiGatewayStageSettings
+                Effect: Allow
+                Action: apigateway:GET
+                Resource:
+                  - arn:aws:apigateway:*::/restapis
+                  - arn:aws:apigateway:*::/restapis/*/stages
+        - !If
+          - LogSampling
+          - PolicyName: tech-audit-log-sampling
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Sid: SampleLogLines
+                  Effect: Allow
+                  Action: logs:FilterLogEvents
+                  Resource: "*"
+          - !Ref AWS::NoValue
       Tags:
         - Key: purpose
           Value: eol-audit

@@ -5,7 +5,7 @@ const CSV_FIELDS = [
   "cycle", "latest", "supportUntil", "eol", "extendedSupport", "note",
 ] as const;
 
-function csvCell(v: unknown): string {
+export function csvCell(v: unknown): string {
   const s = v === null || v === undefined ? "" : String(v);
   // Quote when needed; prefix formula-like cells so spreadsheets don't execute them.
   const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
@@ -17,7 +17,7 @@ export function toCsv(result: AuditResult): string {
   return [CSV_FIELDS.join(","), ...rows].join("\n") + "\n";
 }
 
-function mdCell(v: string): string {
+export function mdCell(v: string): string {
   return v.replace(/\|/g, "\\|").replace(/\n/g, " ");
 }
 

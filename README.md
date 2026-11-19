@@ -115,6 +115,21 @@ Also: `audit` with your own credentials (no `--client`), `audit --role-arn ... -
 `invite --rotate`. Store location: `--store` or `AWS_EOL_AUDIT_STORE` (default `./clients.json`).
 Exit codes: 0 ok, 1 something past EOL (useful as a CI gate), 2 usage or auth error.
 
+## Engg Tech Audit (AWS checks)
+
+```bash
+npx aws-eol-audit tech-audit --client acme --profile <our-profile> --out reports/acme
+```
+
+Answers the 19 questions of the Engg Tech Audit (Project Audit 4.0) that AWS can speak to, each
+with a verdict (`PASS`, `FAIL`, `REVIEW`, `N/A`, `UNKNOWN`) and the evidence behind it. The Markdown
+report ends with a coverage section (fully and partially answerable questions, with this run's
+evidence) and an appendix listing what each check looked at and the permissions it needs. Options:
+`--only IS.6,IS.13`, `--regions`, `--json`, and `--sample-logs` for IS. 8 (the client must deploy the
+role with `AllowLogSampling=true`). Also available as `runTechAudit` and `techAuditClient`. Exit code 1
+when any question is `FAIL`. See `docs/TECH_AUDIT_COVERAGE.md`. Clients onboarded earlier must update
+their stack to the current template, otherwise the new checks report `UNKNOWN`.
+
 ## Security notes
 
 - **Our side:** the identity that runs audits needs only `sts:AssumeRole` on
