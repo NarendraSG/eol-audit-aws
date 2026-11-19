@@ -1,8 +1,10 @@
 # Granting read-only access for the end-of-life audit
 
-This one-off setup lets our audit tool check which software versions your AWS resources run
+This one-off setup lets our audit tools check which software versions your AWS resources run
 (for example Lambda runtimes, database engine versions and Kubernetes versions) so we can tell
-you what is out of support and what needs upgrading.
+you what is out of support and what needs upgrading. It also lets us answer the AWS questions
+in our engineering audit, such as whether databases are publicly reachable, encrypted and
+backed up.
 
 It takes about five minutes and needs someone who can create IAM roles in your account.
 
@@ -11,8 +13,16 @@ It takes about five minutes and needs someone who can create IAM roles in your a
 - A single IAM role, `eol-audit-readonly`, that only our AWS account can use, and only when it
   presents a unique ID we have generated for you (the "external ID").
 - Permission to **list and describe** resources: names, types and version numbers.
+- Permission to read **security and operations settings** used for our engineering audit:
+  network setup (VPCs, security groups), auto scaling, CI/CD pipelines, backup, alarm,
+  encryption and S3 bucket settings, and the IAM credential report (IAM user names with their
+  access key and MFA status, but no passwords or keys).
+- Permission to read your **monthly AWS spend total and budgets**, for the cost question.
+  Each run makes one Cost Explorer request, which AWS bills at USD 0.01.
 - **No access to your data**: the role cannot read S3 objects, database contents, secrets,
-  parameters or logs, and cannot change anything.
+  parameters or logs, and cannot change anything. The one exception is optional: if you set
+  `AllowLogSampling` to `true`, we can read a small sample of recent log lines to check their
+  format. We count the format only and never store the lines.
 - Short-lived credentials only (one hour at a time). No access keys are created or shared.
 - Every action the role takes is recorded in your AWS CloudTrail.
 
@@ -34,7 +44,7 @@ choose **Create stack**.
 
 1. Open **CloudFormation** in the AWS console (any region; IAM roles are global).
 2. Choose **Create stack**, then **With new resources (standard)**.
-3. Choose **Upload a template file** and select `eol-audit-readonly-role.yaml` (sent by us).
+3. Choose **Upload a template file** and select `eol-audit-readonly-role.yaml`.
 4. Stack name: `eol-audit-readonly`.
 5. Enter the `TrustedAccountId` and `ExternalId` we sent you. Leave the other fields as they are.
 6. Tick the IAM acknowledgement box and choose **Create stack**.

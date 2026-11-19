@@ -7,9 +7,12 @@ import type { AwsCredentialIdentityProvider } from "@smithy/types";
 import { callerAccountId, runAudit } from "./audit.js";
 import { assumeRoleCredentials } from "./credentials.js";
 import {
-  auditClient, createInvite, FileConnectionStore, quickCreateUrl, STACK_NAME, TEMPLATE_PATH, verifyConnection,
+  auditClient, techAuditClient, createInvite, FileConnectionStore, quickCreateUrl, STACK_NAME, TEMPLATE_PATH, verifyConnection,
 } from "./onboarding.js";
 import { toCsv, toMarkdown } from "./report.js";
+import { runTechAudit } from "./techaudit/run.js";
+import { toTechAuditCsv, toTechAuditMarkdown } from "./techaudit/report.js";
+import { VERDICT_ORDER, type TechAuditResult } from "./techaudit/types.js";
 import { ALL_SERVICES, STATUS_ORDER, type AuditResult, type ServiceName } from "./types.js";
 
 const USAGE = `aws-eol-audit <command> [options]
@@ -19,6 +22,9 @@ Commands
              --client <name> | --role-arn <arn> [--external-id <id>] | (your own credentials)
              [--regions a,b] [--services lambda,rds,...] [--ssm] [--warn-days 180]
              [--out <dir>] [--json]
+  tech-audit  Answer the Engg Tech Audit questions that AWS can speak to (verdict + evidence)
+             --client <name> | --role-arn <arn> [--external-id <id>] | (your own credentials)
+             [--regions a,b] [--only IS.6,IS.13] [--sample-logs] [--out <dir>] [--json]
   invite   Register a client and print their one-time setup values
              --name <name> [--our-account-id <id>] [--principal-arn <arn>] [--regions a,b]
              [--template-url <s3 url>] [--console-region eu-west-2] [--rotate]
@@ -31,7 +37,7 @@ Common
   --store <path>     Connection store file (default: $AWS_EOL_AUDIT_STORE or ./clients.json)
   --endpoint <url>   Override AWS endpoint (testing)
 
-Exit codes: 0 ok, 1 something past EOL / verify failed, 2 usage or auth error.`;
+Exit codes: 0 ok, 1 something past EOL / a tech-audit FAIL / verify failed, 2 usage or auth error.`;
 
 function list(v: string | string[] | undefined): string[] | undefined {
   if (v === undefined) return undefined;
@@ -51,7 +57,7 @@ async function main(): Promise<number> {
       profile: { type: "string" }, store: { type: "string" }, endpoint: { type: "string" },
       client: { type: "string" }, "role-arn": { type: "string" }, "external-id": { type: "string" },
       regions: { type: "string", multiple: true }, services: { type: "string", multiple: true },
-      ssm: { type: "boolean" }, "warn-days": { type: "string" }, out: { type: "string" }, json: { type: "boolean" },
+      ssm: { type: "boolean" }, only: { type: "string", multiple: true }, "sample-logs": { type: "boolean" }, "warn-days": { type: "string" }, out: { type: "string" }, json: { type: "boolean" },
       name: { type: "string" }, "our-account-id": { type: "string" }, "principal-arn": { type: "string" },
       "template-url": { type: "string" }, "console-region": { type: "string" }, rotate: { type: "boolean" },
       help: { type: "boolean", short: "h" },
@@ -108,6 +114,41 @@ async function main(): Promise<number> {
         process.stderr.write(`Wrote ${stem}.csv and ${stem}.md\n`);
       }
       return result.summary.EOL > 0 ? 1 : 0;
+    }
+
+    case "tech-audit": {
+      if (o.client && o["role-arn"]) fail("Use either --client or --role-arn, not both");
+      const common = { regions: list(o.regions), only: list(o.only), sampleLogs: o["sample-logs"], endpoint };
+      let result: TechAuditResult;
+      try {
+        if (o.client) {
+          result = await techAuditClient(store, o.client, { ...common, baseCredentials: base });
+        } else {
+          const credentials = o["role-arn"]
+            ? assumeRoleCredentials({ roleArn: o["role-arn"], externalId: o["external-id"], sessionName: "tech-audit", baseCredentials: base, endpoint })
+            : base;
+          result = await runTechAudit({ ...common, credentials });
+        }
+      } catch (err) {
+        fail(`Tech audit failed: ${(err as Error).message}`);
+      }
+      if (o.json) {
+        process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+      } else {
+        for (const v of VERDICT_ORDER) {
+          const n = result.results.filter((r) => r.result.verdict === v).length;
+          if (n) process.stdout.write(`${v.padEnd(8)} ${n}\n`);
+        }
+      }
+      if (o.out) {
+        const dir = resolve(o.out);
+        await mkdir(dir, { recursive: true });
+        const stem = join(dir, `tech-audit-${result.accountId}-${result.finishedAt.slice(0, 10)}`);
+        await writeFile(`${stem}.csv`, toTechAuditCsv(result));
+        await writeFile(`${stem}.md`, toTechAuditMarkdown(result, o.client ? `Engg Tech Audit (AWS checks): ${o.client} (${result.accountId})` : undefined));
+        process.stderr.write(`Wrote ${stem}.csv and ${stem}.md\n`);
+      }
+      return result.results.some((r) => r.result.verdict === "FAIL") ? 1 : 0;
     }
 
     case "invite": {

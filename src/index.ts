@@ -7,11 +7,16 @@ export { assumeRoleCredentials, accountIdFromRoleArn, ROLE_ARN_RE } from "./cred
 export type { AssumeRoleOptions } from "./credentials.js";
 export {
   createInvite, verifyConnection, auditClient, quickCreateUrl, generateExternalId,
-  FileConnectionStore, MemoryConnectionStore, TEMPLATE_PATH, STACK_NAME,
+  techAuditClient, FileConnectionStore, MemoryConnectionStore, TEMPLATE_PATH, STACK_NAME,
 } from "./onboarding.js";
 export type {
-  ClientConnection, ConnectionStore, InviteOptions, VerifyOptions, ClientAuditOptions, StackParameters,
+  ClientConnection, ConnectionStore, InviteOptions, VerifyOptions, ClientAuditOptions, ClientTechAuditOptions, StackParameters,
 } from "./onboarding.js";
 export { toCsv, toMarkdown } from "./report.js";
 export { COLLECTORS } from "./collectors/index.js";
 export { parseImage, amiOs, rdsVersion, openSearchVersion } from "./collectors/parse.js";
+export { runTechAudit, runCheck } from "./techaudit/run.js";
+export { toTechAuditCsv, toTechAuditMarkdown } from "./techaudit/report.js";
+export { QUESTIONS, QUESTIONNAIRE_TOTAL, NOT_FROM_AWS } from "./techaudit/questions.js";
+export { VERDICT_ORDER } from "./techaudit/types.js";
+export type { Verdict, Question, CheckResult, QuestionResult, TechAuditResult, TechAuditOptions } from "./techaudit/types.js";

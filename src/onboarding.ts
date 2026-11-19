@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import type { AwsCredentialIdentityProvider } from "@smithy/types";
 import { runAudit, callerAccountId, type AuditOptions } from "./audit.js";
 import { accountIdFromRoleArn, assumeRoleCredentials } from "./credentials.js";
+import { runTechAudit } from "./techaudit/run.js";
+import type { TechAuditOptions, TechAuditResult } from "./techaudit/types.js";
 import type { AuditResult } from "./types.js";
 
 /**
@@ -197,4 +199,21 @@ export async function auditClient(store: ConnectionStore, name: string, opts: Cl
     region: opts.regions?.[0] ?? conn.regions?.[0],
   });
   return runAudit({ ...rest, credentials, regions: opts.regions ?? (conn.regions?.length ? conn.regions : undefined) });
+}
+
+export interface ClientTechAuditOptions extends Omit<TechAuditOptions, "credentials"> {
+  baseCredentials?: AwsCredentialIdentityProvider;
+}
+
+/** Assume a connected client's role and run the Engg Tech Audit checks. Uses the client's registered regions by default. */
+export async function techAuditClient(store: ConnectionStore, name: string, opts: ClientTechAuditOptions = {}): Promise<TechAuditResult> {
+  const conn = await store.get(name);
+  if (!conn) throw new Error(`Unknown client '${name}'`);
+  if (!conn.roleArn) throw new Error(`Client '${name}' has not been verified yet`);
+  const { baseCredentials, ...rest } = opts;
+  const credentials = assumeRoleCredentials({
+    roleArn: conn.roleArn, externalId: conn.externalId, sessionName: "tech-audit", baseCredentials, endpoint: opts.endpoint,
+    region: opts.regions?.[0] ?? conn.regions?.[0],
+  });
+  return runTechAudit({ ...rest, credentials, regions: opts.regions ?? (conn.regions?.length ? conn.regions : undefined) });
 }
