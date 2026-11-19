@@ -1,4 +1,4 @@
-import type { AwsClientOptions } from "../types.js";
+import type { AuditResult, AwsClientOptions } from "../types.js";
 
 export type Verdict = "PASS" | "FAIL" | "REVIEW" | "N/A" | "UNKNOWN";
 /** Order used in summaries: things needing attention first. */
@@ -35,6 +35,8 @@ export interface TechAuditResult {
   startedAt: string;
   finishedAt: string;
   results: QuestionResult[];
+  /** Full EOL inventory from the same run, for the standard EOL report. */
+  eol?: AuditResult;
 }
 
 export interface TechAuditOptions extends AwsClientOptions {

@@ -147,6 +147,12 @@ async function main(): Promise<number> {
         await writeFile(`${stem}.csv`, toTechAuditCsv(result));
         await writeFile(`${stem}.md`, toTechAuditMarkdown(result, o.client ? `Engg Tech Audit (AWS checks): ${o.client} (${result.accountId})` : undefined));
         process.stderr.write(`Wrote ${stem}.csv and ${stem}.md\n`);
+        if (result.eol) {
+          const eolStem = join(dir, `eol-${result.accountId}-${result.eol.finishedAt.slice(0, 10)}`);
+          await writeFile(`${eolStem}.csv`, toCsv(result.eol));
+          await writeFile(`${eolStem}.md`, toMarkdown(result.eol, o.client ? `EOL audit: ${o.client} (${result.accountId})` : undefined));
+          process.stderr.write(`Wrote ${eolStem}.csv and ${eolStem}.md\n`);
+        }
       }
       return result.results.some((r) => r.result.verdict === "FAIL") ? 1 : 0;
     }

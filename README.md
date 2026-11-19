@@ -130,6 +130,9 @@ role with `AllowLogSampling=true`). Also available as `runTechAudit` and `techAu
 when any question is `FAIL`. See `docs/TECH_AUDIT_COVERAGE.md`. Clients onboarded earlier must update
 their stack to the current template, otherwise the new checks report `UNKNOWN`.
 
+With `--out`, the same run also writes the standard EOL resource report (`eol-<account>-<date>.md` and
+`.csv`), so one command produces both reports. IS. 16 summarises it; the EOL report has the detail.
+
 ## Security notes
 
 - **Our side:** the identity that runs audits needs only `sts:AssumeRole` on

@@ -1,5 +1,5 @@
 import { callerAccountId, enabledRegions, runAudit } from "../audit.js";
-import type { AwsClientOptions } from "../types.js";
+import type { AuditResult, AwsClientOptions } from "../types.js";
 import { CHECKS } from "./checks.js";
 import { CheckError, Ctx, errText } from "./context.js";
 import { normaliseSec, QUESTIONS } from "./questions.js";
@@ -43,12 +43,19 @@ export async function runTechAudit(opts: TechAuditOptions = {}): Promise<TechAud
   const { account } = await callerAccountId({ ...aws, region: first });
   const regions = opts.regions?.length ? [...opts.regions] : await enabledRegions({ ...aws, region: first });
 
+  let eol: AuditResult | undefined;
   const ctx = new Ctx({
     ...aws, accountId: account, regions, sampleLogs: opts.sampleLogs ?? false, pollMs: opts.pollMs ?? 2000,
     // Reuse the EOL audit for IS. 16 and EG. 21; services it cannot read are skipped, not fatal.
-    eolComponents: async () => (await runAudit({ ...aws, regions })).components,
+    eolComponents: async () => (eol = await runAudit({ ...aws, regions })).components,
   });
   const results: QuestionResult[] = [];
   for (const question of questions) results.push({ question, result: await runCheck(ctx, question) });
-  return { accountId: account, regions, startedAt, finishedAt: new Date().toISOString(), results };
+  // The standard EOL resource report is produced alongside; reuse the inventory if a check already ran it.
+  try {
+    await ctx.eolComponents();
+  } catch {
+    eol = undefined; // the tech audit result is still valid without it
+  }
+  return { accountId: account, regions, startedAt, finishedAt: new Date().toISOString(), results, eol };
 }
